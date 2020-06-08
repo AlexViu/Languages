@@ -21,8 +21,6 @@ class LanguageRepository extends ServiceEntityRepository
         $this->manager = $manager;
     }
 
-    
-
     public function save(Language $language)
     {
         $this->manager->persist($language);
