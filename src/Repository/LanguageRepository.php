@@ -23,16 +23,12 @@ class LanguageRepository extends ServiceEntityRepository
 
     
 
-    public function save($name, $langKey)
+    public function save(Language $language)
     {
-        $new = new Language();
-
-        $new
-            ->setName($name)
-            ->setLangKey($langKey);
-
-        $this->manager->persist($new);
+        $this->manager->persist($language);
         $this->manager->flush();
+
+        return $language;
     }
 
     public function update(Language $language): Language
