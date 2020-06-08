@@ -1,0 +1,159 @@
+<?php
+namespace App\Controller;
+use App\Repository\TranslationRepository;
+use App\Repository\ContainerRepository;
+use App\Repository\LanguageRepository;
+use App\Entity\Translation;
+use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\Routing\Annotation\Route;
+
+/**
+ * Class TranslationController
+ * @package App\Controller
+ *
+ * @Route(path="/api/")
+ */
+class TranslationController
+{
+    private $translationRepository;
+    private $languageRepository;
+    private $containerRepository;
+
+    public function __construct(TranslationRepository $translationRepository, LanguageRepository $languageRepository, ContainerRepository $containerRepository)
+    {
+        $this->translationRepository = $translationRepository;
+        $this->languageRepository = $languageRepository;
+        $this->containerRepository = $containerRepository;
+    }
+
+    /**
+     * @Route("translation", name="add_translation", methods={"POST"})
+     */
+    public function add(Request $request): JsonResponse
+    {
+        $data = json_decode($request->getContent(), true);
+
+        $containerId = $data['containerId'];
+        $langId = $data['langId'];
+        $transKey = $data['transKey'];
+        $value = $data['value'];
+        
+        if (empty($containerId) || empty($langId) || empty($transKey) || empty($value)) {
+            throw new NotFoundHttpException('Expecting mandatory parameters!');
+        }
+
+        // obtenemos el grupo
+        $container = $this->containerRepository->findOneBy(['id' => $containerId]);
+        if(empty($container)) {
+            throw new NotFoundHttpException('El contenedor no es valido!');
+        }
+
+        // obtenemos el idioma
+        $lang = $this->languageRepository->findOneBy(['id' => $langId]);
+        if(empty($lang)) {
+            throw new NotFoundHttpException('El Lenguaje no es valido!');
+        }
+
+        //creamos la entidad trasnlation
+        $translation = new Translation();
+        $translation
+            ->setContainer($container)
+            ->setLang($lang)
+            ->setTransKey($transKey)
+            ->setValue($value);
+
+        $translation = $this->translationRepository->save($translation);
+
+        return new JsonResponse($translation->toJson(), Response::HTTP_CREATED);
+    }
+
+    /**
+     * @Route("translation/{id}", name="get_one_translation", methods={"GET"})
+     */
+    public function get($id): JsonResponse
+    {
+        $translation = $this->translationRepository->findOneBy(['id' => $id]);
+        
+        if (empty($translation)) {
+            return new JsonResponse(null, Response::HTTP_OK);
+        }
+
+        return new JsonResponse($translation->toJson(), Response::HTTP_OK);
+    }
+
+    /**
+     * @Route("translation", name="get_all_translation", methods={"GET"})
+     */
+    public function getAll(): JsonResponse
+    {
+        $translations = $this->translationRepository->findAll();
+        $data = [];
+
+        foreach ($translations as $translation) {
+            $data[] = $translation->toJson();
+        }
+
+        return new JsonResponse($data, Response::HTTP_OK);
+    }
+
+    /**
+     * @Route("translation/{id}", name="update_translation", methods={"PUT"})
+     */
+    public function update($id, Request $request): JsonResponse
+    {
+        $translation = $this->translationRepository->findOneBy(['id' => $id]);
+
+        if (empty($translation)) {
+            throw new NotFoundHttpException('No se encuentra la traduccion!');
+        }
+
+        $data = json_decode($request->getContent(), true);
+
+        if(!empty($data['containerId'])) {
+            // obtenemos el grupo
+            $container = $this->containerRepository->findOneBy(['id' => $data['containerId']]);
+            if(empty($container)) {
+                throw new NotFoundHttpException('El contenedor no es valido!');
+            }
+            
+            $translation->setContainer($container);
+        }
+
+        if(!empty($data['langId'])) {
+            // obtenemos el grupo
+            $lang = $this->languageRepository->findOneBy(['id' => $data['langId']]);
+            if(empty($lang)) {
+                throw new NotFoundHttpException('El contenedor no es valido!');
+            }
+            $translation->setLang($lang);
+        }
+
+        empty($data['transKey']) ? true : $translation->setTransKey($data['transKey']);
+        empty($data['value']) ? true : $translation->setValue($data['value']);
+
+        $updatedtranslation = $this->translationRepository->update($translation);
+
+		return new JsonResponse($translation->toJson(), Response::HTTP_OK);
+    }
+
+    /**
+     * @Route("translation/{id}", name="delete_translation", methods={"DELETE"})
+     */
+    public function delete($id): JsonResponse
+    {
+        $translation = $this->translationRepository->findOneBy(['id' => $id]);
+
+        if (empty($translation)) {
+            throw new NotFoundHttpException('No se encuentra la traduccion!');
+        }
+
+        $this->translationRepository->remove($translation);
+
+        return new JsonResponse(true, Response::HTTP_OK);
+    }
+}
+
+?>
