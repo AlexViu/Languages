@@ -6,6 +6,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Annotation\Route;
+use App\Entity\Language;
 
 /**
  * Class LanguageController
@@ -20,6 +21,13 @@ class LanguageController
     public function __construct(LanguageRepository $languageRepository)
     {
         $this->languageRepository = $languageRepository;
+        
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: GET, POST, PATCH, PUT, DELETE, OPTIONS');
+        header('Access-Control-Allow-Credentials: true');
+        header('Access-Control-Max-Age:86400');
+        header('Access-Control-Allow-Headers: Origin, Content-Type, X-Auth-Token,  Accept, Authorization, X-Requested-With');
+
     }
 
     /**
@@ -36,9 +44,16 @@ class LanguageController
             throw new NotFoundHttpException('Expecting mandatory parameters!');
         }
 
-        $this->languageRepository->save($name, $langKey);
+        //creamos la entidad language
+        $language = new Language();
+        $language
+            ->setName($name)
+            ->setLangKey($langKey);
 
-        return new JsonResponse(['status' => 'Language created!'], Response::HTTP_CREATED);
+        $language = $this->languageRepository->save($language);
+
+        return new JsonResponse($language->toJson(), Response::HTTP_CREATED);
+
     }
 
     /**
@@ -52,13 +67,9 @@ class LanguageController
             return new JsonResponse(null, Response::HTTP_OK);
         }
 
-        $data = [
-            'id' => $language->getId(),
-            'name' => $language->getName(),
-            'langKey' => $language->getLangKey()
-        ];
+        return new JsonResponse($language->toJson(), Response::HTTP_OK);
 
-        return new JsonResponse($data, Response::HTTP_OK);
+
     }
 
     /**
@@ -70,11 +81,7 @@ class LanguageController
         $data = [];
 
         foreach ($languages as $language) {
-            $data[] = [
-                'id' => $language->getId(),
-                'name' => $language->getName(),
-                'langKey' => $language->getLangKey()
-            ];
+            $data[] = $language->toJson();
         }
 
         return new JsonResponse($data, Response::HTTP_OK);
@@ -86,14 +93,18 @@ class LanguageController
     public function update($id, Request $request): JsonResponse
     {
         $language = $this->languageRepository->findOneBy(['id' => $id]);
+        if (empty($language)) {
+            throw new NotFoundHttpException('Expecting mandatory parameters!');
+        }
+
         $data = json_decode($request->getContent(), true);
 
         empty($data['name']) ? true : $language->setName($data['name']);
         empty($data['langKey']) ? true : $language->setLangKey($data['langKey']);
 
-        $updatedLanguage = $this->languageRepository->update($language);
+        $this->languageRepository->update($language);
 
-		return new JsonResponse(['status' => 'Language updated!'], Response::HTTP_OK);
+		return new JsonResponse($language->toJson(), Response::HTTP_OK);
     }
 
     /**
@@ -102,11 +113,14 @@ class LanguageController
     public function delete($id): JsonResponse
     {
         $language = $this->languageRepository->findOneBy(['id' => $id]);
+        if (empty($language)) {
+            throw new NotFoundHttpException('Expecting mandatory parameters!');
+        }
 
         $this->languageRepository->remove($language);
 
-        return new JsonResponse(['status' => 'Language deleted'], Response::HTTP_OK);
+        return new JsonResponse(true, Response::HTTP_OK);
+
     }
 }
-
 ?>

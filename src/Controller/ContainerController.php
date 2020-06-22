@@ -6,6 +6,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Annotation\Route;
+use App\Entity\Container;
 
 /**
  * Class ContainerController
@@ -35,9 +36,15 @@ class ContainerController
             throw new NotFoundHttpException('Expecting mandatory parameters!');
         }
 
-        $this->containerRepository->save($name);
+        //creamos la entidad container
+        $container = new Container();
+        $container
+            ->setName($name);
 
-        return new JsonResponse(['status' => 'Container created!'], Response::HTTP_CREATED);
+        $container = $this->containerRepository->save($container);
+
+        return new JsonResponse($container->toJson(), Response::HTTP_CREATED);
+
     }
 
     /**
@@ -51,12 +58,8 @@ class ContainerController
             return new JsonResponse(null, Response::HTTP_OK);
         }
 
-        $data = [
-            'id' => $container->getId(),
-            'name' => $container->getName(),
-        ];
 
-        return new JsonResponse($data, Response::HTTP_OK);
+        return new JsonResponse($container->toJson(), Response::HTTP_OK);
     }
 
     /**
@@ -68,10 +71,7 @@ class ContainerController
         $data = [];
 
         foreach ($containers as $container) {
-            $data[] = [
-                'id' => $container->getId(),
-                'name' => $container->getName(),
-            ];
+            $data[] = $container->toJson();
         }
 
         return new JsonResponse($data, Response::HTTP_OK);
@@ -83,13 +83,17 @@ class ContainerController
     public function update($id, Request $request): JsonResponse
     {
         $container = $this->containerRepository->findOneBy(['id' => $id]);
+        if (empty($container)) {
+            throw new NotFoundHttpException('Expecting mandatory parameters!');
+        }
+       
         $data = json_decode($request->getContent(), true);
 
         empty($data['name']) ? true : $container->setName($data['name']);
 
-        $updatedcontainer = $this->containerRepository->update($container);
+        $this->containerRepository->update($container);
 
-		return new JsonResponse(['status' => 'Container updated!'], Response::HTTP_OK);
+		return new JsonResponse($container->toJson(), Response::HTTP_OK);
     }
 
     /**
@@ -98,10 +102,13 @@ class ContainerController
     public function delete($id): JsonResponse
     {
         $container = $this->containerRepository->findOneBy(['id' => $id]);
+        if (empty($container)) {
+            throw new NotFoundHttpException('Expecting mandatory parameters!');
+        }
 
         $this->containerRepository->remove($container);
 
-        return new JsonResponse(['status' => 'Container deleted'], Response::HTTP_OK);
+        return new JsonResponse(true, Response::HTTP_OK);
     }
 }
 

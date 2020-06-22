@@ -21,15 +21,13 @@ class ContainerRepository extends ServiceEntityRepository
         $this->manager = $manager;
     }
 
-    public function save($name)
+    public function save(Container $container)
     {
-        $new = new Container();
 
-        $new
-            ->setName($name);
-
-        $this->manager->persist($new);
+        $this->manager->persist($container);
         $this->manager->flush();
+
+        return $container;
     }
 
     public function update(Container $container): Container
