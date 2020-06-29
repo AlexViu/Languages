@@ -21,6 +21,13 @@ class ContainerController
     public function __construct(ContainerRepository $containerRepository)
     {
         $this->containerRepository = $containerRepository;
+
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: GET, POST, PATCH, PUT, DELETE, OPTIONS');
+        header('Access-Control-Allow-Credentials: true');
+        header('Access-Control-Max-Age:86400');
+        header('Access-Control-Allow-Headers: Origin, Content-Type, X-Auth-Token,  Accept, Authorization, X-Requested-With');
+
     }
 
     /**

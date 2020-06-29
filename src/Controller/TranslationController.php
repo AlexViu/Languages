@@ -27,6 +27,12 @@ class TranslationController
         $this->translationRepository = $translationRepository;
         $this->languageRepository = $languageRepository;
         $this->containerRepository = $containerRepository;
+
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: GET, POST, PATCH, PUT, DELETE, OPTIONS');
+        header('Access-Control-Allow-Credentials: true');
+        header('Access-Control-Max-Age:86400');
+        header('Access-Control-Allow-Headers: Origin, Content-Type, X-Auth-Token,  Accept, Authorization, X-Requested-With');
     }
 
     /**
@@ -81,6 +87,8 @@ class TranslationController
             return new JsonResponse(null, Response::HTTP_OK);
         }
 
+        
+
         return new JsonResponse($translation->toJson(), Response::HTTP_OK);
     }
 
@@ -91,12 +99,29 @@ class TranslationController
     {
         $translations = $this->translationRepository->findAll();
         $data = [];
+        $array_data = [];
 
         foreach ($translations as $translation) {
-            $data[] = $translation->toJson();
+           
+            $array_aux_translate = [];
+            $array_aux_translate['id'] = $translation->getId();
+            $array_aux_translate['value'] = $translation->getValue();
+            $array_aux_translate['lang'] = $translation->getLang()->getLangKey();
+            
+            $array_data[$translation->getTransKey()]['translates'][$translation->getLang()->getId()] = $array_aux_translate;
+            $array_data[$translation->getTransKey()]['container'] = $translation->getContainer()->getName();
         }
 
-        return new JsonResponse($data, Response::HTTP_OK);
+        foreach($array_data as $key => $values) {
+            $array_aux = [];
+            $array_aux['transKey'] =  $key;
+            $array_aux['container'] =  $values['container'];
+            $array_aux['translate'] = $values['translates'];
+
+            $data[] = $array_aux;
+        }
+        
+        return new JsonResponse( $data, Response::HTTP_OK);
     }
 
     /**
