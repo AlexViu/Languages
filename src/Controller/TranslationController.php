@@ -43,37 +43,41 @@ class TranslationController
         $data = json_decode($request->getContent(), true);
 
         $containerId = $data['containerId'];
-        $langId = $data['langId'];
         $transKey = $data['transKey'];
-        $value = $data['value'];
-        
-        if (empty($containerId) || empty($langId) || empty($transKey) || empty($value)) {
+        $translates = $data['translates'];
+
+        if ( empty($transKey)) {
             throw new NotFoundHttpException('Expecting mandatory parameters!');
         }
 
-        // obtenemos el grupo
-        $container = $this->containerRepository->findOneBy(['id' => $containerId]);
-        if(empty($container)) {
-            throw new NotFoundHttpException('El contenedor no es valido!');
+        // obtenemos el contenedor
+        if($containerId != null){
+            $container = $this->containerRepository->findOneBy(['id' => $containerId]);
+        } else {
+            $container = null;
         }
+        
+        
 
-        // obtenemos el idioma
-        $lang = $this->languageRepository->findOneBy(['id' => $langId]);
-        if(empty($lang)) {
-            throw new NotFoundHttpException('El Lenguaje no es valido!');
+        foreach ($translates as $translate) {
+
+            // obtenemos el idioma
+            $lang = $this->languageRepository->findOneBy(['id' => $translate['langId']]);
+            if(empty($lang)) {
+                throw new NotFoundHttpException('El Lenguaje no es valido!');
+            }
+            
+            //creamos la entidad trasnlation
+            $translation = new Translation();
+            $translation
+                ->setContainer($container)
+                ->setLang($lang)
+                ->setTransKey($transKey)
+                ->setValue($translate['value']);
+
+            $translation = $this->translationRepository->save($translation);
         }
-
-        //creamos la entidad trasnlation
-        $translation = new Translation();
-        $translation
-            ->setContainer($container)
-            ->setLang($lang)
-            ->setTransKey($transKey)
-            ->setValue($value);
-
-        $translation = $this->translationRepository->save($translation);
-
-        return new JsonResponse($translation->toJson(), Response::HTTP_CREATED);
+        return new JsonResponse("ok", Response::HTTP_CREATED);
     }
 
     /**
@@ -106,10 +110,14 @@ class TranslationController
             $array_aux_translate = [];
             $array_aux_translate['id'] = $translation->getId();
             $array_aux_translate['value'] = $translation->getValue();
-            $array_aux_translate['lang'] = $translation->getLang()->getLangKey();
+            $array_aux_translate['langId'] = $translation->getLang()->getId();
             
-            $array_data[$translation->getTransKey()]['translates'][$translation->getLang()->getId()] = $array_aux_translate;
+            $array_data[$translation->getTransKey()]['translates'][$translation->getLang()->getLangKey()] = $array_aux_translate;
+           if ($translation->getContainer() != null) {
             $array_data[$translation->getTransKey()]['container'] = $translation->getContainer()->getName();
+           } else {
+            $array_data[$translation->getTransKey()]['container'] = "";
+           }
         }
 
         foreach($array_data as $key => $values) {

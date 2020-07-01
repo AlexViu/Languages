@@ -21,7 +21,7 @@ class Translation
 
     /**
      * @ORM\ManyToOne(targetEntity=container::class)
-     * @ORM\JoinColumn(nullable=false)
+     * @ORM\JoinColumn(nullable=true)
      */
     private $container;
 
