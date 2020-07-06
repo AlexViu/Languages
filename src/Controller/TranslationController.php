@@ -11,6 +11,7 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Annotation\Route;
 use Google\Cloud\Translate\V2\TranslateClient;
 
+
 /**
  * Class TranslationController
  * @package App\Controller
@@ -203,6 +204,35 @@ class TranslationController
             throw new NotFoundHttpException('No se encuentra la traduccion!');
         }
         return new JsonResponse($data, Response::HTTP_OK);
+    }
+
+    /**
+     * @Route("download", name="download", methods={"GET"})
+     */
+    public function download(): JsonResponse
+    { 
+        $path = storage_path(sprintf(‘app/’, $directory)); 
+
+        $filename = sprintf(‘%s.zip’, $path);
+
+        $zip = new ZipArchive;  
+        $zip->open($filename, ZipArchive::CREATE);
+
+        $files = new RecursiveIteratorIterator(  
+            new RecursiveDirectoryIterator($path),  
+            RecursiveIteratorIterator::LEAVES_ONLY  
+            );
+        foreach ($files as $name => $file) {  
+                if (! $file->isDir()) {  
+                $filePath = $file->getRealPath();
+                
+                $relativePath = substr($filePath, strlen($path) + 1);
+                
+                $zip->addFile($filePath, $relativePath);  
+            }  
+        }
+
+        $zip->close(); 
     }
 }
 
