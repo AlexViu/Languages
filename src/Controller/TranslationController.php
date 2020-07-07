@@ -10,6 +10,8 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Annotation\Route;
 use Google\Cloud\Translate\V2\TranslateClient;
+use Symfony\Component\HttpKernel\Kernel;
+use Symfony\Component\Filesystem\Filesystem;
 
 
 /**
@@ -23,12 +25,17 @@ class TranslationController
     private $translationRepository;
     private $languageRepository;
     private $containerRepository;
+    private $projectDir;
+    //public const GOOGLE_APPLICATION_CREDENTIALS =  "/var/www/html/languages_yulava/resources/credentials.json";
 
-    public function __construct(TranslationRepository $translationRepository, LanguageRepository $languageRepository, ContainerRepository $containerRepository)
+
+    public function __construct(TranslationRepository $translationRepository, LanguageRepository $languageRepository, ContainerRepository $containerRepository, string $projectDir )
     {
         $this->translationRepository = $translationRepository;
         $this->languageRepository = $languageRepository;
         $this->containerRepository = $containerRepository;
+        $this->projectDir = $projectDir;
+       
 
         header('Access-Control-Allow-Origin: *');
         header('Access-Control-Allow-Methods: GET, POST, PATCH, PUT, DELETE, OPTIONS');
@@ -145,6 +152,9 @@ class TranslationController
                 $this->translationRepository->update($translation);
             }
         }
+
+        $version = uniqid();
+
         return new JsonResponse("ok", Response::HTTP_OK);
     }
 
@@ -177,6 +187,7 @@ class TranslationController
      */
     public function autoTranslate(Request $request): JsonResponse
     {
+        
         $data = json_decode($request->getContent(), true);
         $text = $data['text'];
         $source = $data['source'];
@@ -201,7 +212,7 @@ class TranslationController
                 $data[] = $array_translate;
             }
         } catch (\Exception $e) {
-            throw new NotFoundHttpException('No se encuentra la traduccion!');
+            throw new NotFoundHttpException('No se encuentra la traduccion! .' . $e);
         }
         return new JsonResponse($data, Response::HTTP_OK);
     }
@@ -209,30 +220,63 @@ class TranslationController
     /**
      * @Route("download", name="download", methods={"GET"})
      */
-    public function download(): JsonResponse
-    { 
-        $path = storage_path(sprintf(‘app/’, $directory)); 
+    public function download(Request $request): JsonResponse
+    {
+        $zip = new \ZipArchive();
+       
+        // el nombre del fichero va a ser la version actual
 
-        $filename = sprintf(‘%s.zip’, $path);
+        // validar si existe un fichero con el numero de version, si no existe 
 
-        $zip = new ZipArchive;  
-        $zip->open($filename, ZipArchive::CREATE);
+        $version = "xsdsdfsd";
+        $data['url'] = "/translates/".$version.".zip";
+        $fileNameZip = $this->projectDir . "/public/" .$data['url'];
 
-        $files = new RecursiveIteratorIterator(  
-            new RecursiveDirectoryIterator($path),  
-            RecursiveIteratorIterator::LEAVES_ONLY  
-            );
-        foreach ($files as $name => $file) {  
-                if (! $file->isDir()) {  
-                $filePath = $file->getRealPath();
-                
-                $relativePath = substr($filePath, strlen($path) + 1);
-                
-                $zip->addFile($filePath, $relativePath);  
-            }  
+        // si el fichero existe se hace un return 
+        //return new JsonResponse($data, Response::HTTP_OK);
+
+        if ($zip->open($fileNameZip, \ZipArchive::CREATE)!==TRUE) {
+            exit("cannot open <$fileNameZip>\n");
         }
 
-        $zip->close(); 
+        try {
+            // traemos el listado de idiomas
+            $languages = $this->languageRepository->findAll();
+            $containers = $this->containerRepository->findAll();
+         
+            foreach ($languages as $language) {
+                $arrayLanguage = [];
+                // primero sacamos las traducciones para el contenedos null
+                $translates = $this->translationRepository->findBy(["container" => null, "lang" => $language->getId() ]);
+
+                foreach ($translates as $translate) {
+                    $arrayLanguage[$translate->getTransKey()] = $translate->getValue();
+                }
+
+                foreach ($containers as $container) {
+                    $translates = $this->translationRepository->findBy(["container" => $container->getId(), "lang" => $language->getId() ]);
+
+                    foreach ($translates as $translate) {
+                        $arrayLanguage[$container->getName()][$translate->getTransKey()] =$translate->getValue();
+                    }
+                }
+
+                $fileLanguage = $this->projectDir . '/public/translates/' . $language->getLangKey() . ".json" ;
+                
+                // por cada idioma generamos un json que guardamos en el zip
+                $fs = new Filesystem();
+                $fs->dumpFile($fileLanguage, json_encode($arrayLanguage));
+                $zip->addFile($fileLanguage, $language->getLangKey() . ".json");
+                
+                
+            }
+            $zip->close();
+        }
+        catch(IOException $e) {
+        }
+
+
+        return new JsonResponse($data, Response::HTTP_OK);
     }
 }
 
