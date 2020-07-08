@@ -3,7 +3,9 @@ namespace App\Controller;
 use App\Repository\TranslationRepository;
 use App\Repository\ContainerRepository;
 use App\Repository\LanguageRepository;
+use App\Repository\TranslationVersionRepository;
 use App\Entity\Translation;
+use App\Entity\TranslationVersion;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -25,15 +27,16 @@ class TranslationController
     private $translationRepository;
     private $languageRepository;
     private $containerRepository;
+    private $translationVersionRepository;
     private $projectDir;
-    //public const GOOGLE_APPLICATION_CREDENTIALS =  "/var/www/html/languages_yulava/resources/credentials.json";
 
 
-    public function __construct(TranslationRepository $translationRepository, LanguageRepository $languageRepository, ContainerRepository $containerRepository, string $projectDir )
+    public function __construct(TranslationRepository $translationRepository, LanguageRepository $languageRepository, ContainerRepository $containerRepository, string $projectDir, TranslationVersionRepository $translationVersionRepository )
     {
         $this->translationRepository = $translationRepository;
         $this->languageRepository = $languageRepository;
         $this->containerRepository = $containerRepository;
+        $this->translationVersionRepository = $translationVersionRepository;
         $this->projectDir = $projectDir;
        
 
@@ -84,6 +87,10 @@ class TranslationController
             
             $translation = $this->translationRepository->save($translation);
         }
+
+        $translationVersion = new TranslationVersion();
+        $this->translationVersionRepository->save($translationVersion);
+
         return new JsonResponse("ok", Response::HTTP_CREATED);
     }
 
@@ -153,7 +160,8 @@ class TranslationController
             }
         }
 
-        $version = uniqid();
+        $translationVersion = new TranslationVersion();
+        $this->translationVersionRepository->save($translationVersion);
 
         return new JsonResponse("ok", Response::HTTP_OK);
     }
@@ -177,6 +185,10 @@ class TranslationController
 
             $this->translationRepository->remove($translation);
         }
+
+        $translationVersion = new TranslationVersion();
+        $this->translationVersionRepository->save($translationVersion);
+        
         return new JsonResponse(true, Response::HTTP_OK);
     }
 
@@ -225,15 +237,20 @@ class TranslationController
         $zip = new \ZipArchive();
        
         // el nombre del fichero va a ser la version actual
+        $version = $this->translationVersionRepository->findOneBy([], ["executed_at" => "DESC"]);
 
-        // validar si existe un fichero con el numero de version, si no existe 
-
-        $version = "xsdsdfsd";
-        $data['url'] = "/translates/".$version.".zip";
+        $data['url'] = "/translates/" . $version->getVersion() . "/".$version->getVersion().".zip";
         $fileNameZip = $this->projectDir . "/public/" .$data['url'];
 
-        // si el fichero existe se hace un return 
-        //return new JsonResponse($data, Response::HTTP_OK);
+        if (file_exists($fileNameZip)) {
+            return new JsonResponse($data, Response::HTTP_OK);
+        }
+       
+        // si no existe eliminamos la carpeta entera, ya que se va a generar una nueva version
+        if (is_dir( $this->projectDir . "/public/translates")) {
+            $dir = $this->projectDir . "/public/translates";
+            $this->removeDirectory($dir);
+        }
 
         if ($zip->open($fileNameZip, \ZipArchive::CREATE)!==TRUE) {
             exit("cannot open <$fileNameZip>\n");
@@ -261,7 +278,7 @@ class TranslationController
                     }
                 }
 
-                $fileLanguage = $this->projectDir . '/public/translates/' . $language->getLangKey() . ".json" ;
+                $fileLanguage = $this->projectDir . '/public/translates/' . $version->getVersion() ."/" . $language->getLangKey() . ".json" ;
                 
                 // por cada idioma generamos un json que guardamos en el zip
                 $fs = new Filesystem();
@@ -274,9 +291,18 @@ class TranslationController
         }
         catch(IOException $e) {
         }
-
-
         return new JsonResponse($data, Response::HTTP_OK);
+    }
+
+    function removeDirectory($path) {
+
+        $files = glob($path . '/*');
+        foreach ($files as $file) {
+            is_dir($file) ? $this->removeDirectory($file) : unlink($file);
+        }
+        rmdir($path);
+    
+        return;
     }
 }
 
